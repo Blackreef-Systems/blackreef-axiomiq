@@ -1,0 +1,3 @@
+[console_scripts]
+axiomiq = axiomiq.cli:main
+axiomiq-generate = axiomiq.tools.generate_readings:main

@@ -1,0 +1,7 @@
+engine_id,health,top_risk,eta_days,priority
+DG1,70.4,lo_inlet_temp_c,,MED
+DG2,66.5,htcw_engine_outlet_temp_c,,MED
+DG3,70.4,htcw_engine_outlet_temp_c,,MED
+DG4,70.6,htcw_engine_outlet_temp_c,,MED
+DG5,69.4,lo_inlet_temp_c,,MED
+DG6,72.1,htcw_engine_outlet_temp_c,,MED
