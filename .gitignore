@@ -1,0 +1,19 @@
+# venv
+.venv/
+venv/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# local runs
+data/
+outputs/
+
+# vscode
+.vscode/
