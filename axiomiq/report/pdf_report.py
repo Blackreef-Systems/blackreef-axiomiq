@@ -121,6 +121,7 @@ def write_pdf_report(
     focus_engine_id: str,
     focus_score: float,
     focus_risks: pd.DataFrame,
+    focus_trends: dict[str, list[float]] | None = None,
     notes: list[str] | None = None,
     run_config: dict[str, str] | None = None,
 ) -> Path:
@@ -272,7 +273,44 @@ def write_pdf_report(
     )
     y -= 10
     
-    
+    # ------------------------
+    # Top Alerts (top 3 engines)
+    # ------------------------
+    if not fleet_df.empty:
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(left, y, "Top Alerts")
+        y -= 14
+
+        # Sort by priority then health (lowest health first inside same priority)
+        pri_rank = {"HIGH": 0, "MED": 1, "LOW": 2}
+        tmp = fleet_df.copy()
+        if "priority" in tmp.columns:
+            tmp["_pri_rank"] = tmp["priority"].map(lambda x: pri_rank.get(str(x), 9))
+        else:
+            tmp["_pri_rank"] = 9
+        if "health" in tmp.columns:
+            tmp["_health"] = pd.to_numeric(tmp["health"], errors="coerce")
+        else:
+            tmp["_health"] = 999.0
+
+        tmp = tmp.sort_values(["_pri_rank", "_health"]).head(3)
+
+        c.setFont("Helvetica", 9)
+        for _, rr in tmp.iterrows():
+            eng = str(rr.get("engine_id", ""))
+            pri = str(rr.get("priority", ""))
+            hs = rr.get("health", "")
+            top = str(rr.get("top_risk", ""))
+            eta = _fmt_eta(rr.get("eta_days"))
+            action = str(rr.get("action", ""))
+
+            # single compact line (wrap-safe)
+            alert = f"{eng} [{pri}]  Health {hs}  |  {top}  |  ETA {eta}  |  {action}"
+            y = _draw_wrapped(c, left, y, alert, max_width, line_height=11, font_name="Helvetica", font_size=9)
+            y -= 2
+
+        y -= 6
+
     # Table header
     c.setFont("Helvetica-Bold", 9)
     c.drawString(X["engine"], y, "Engine")
@@ -422,31 +460,58 @@ def write_pdf_report(
                 y = page_h - 60
 
             c.setFont("Helvetica-Bold", 10)
-            c.drawString(left, y, f"- {param} ({interp['system']})  Trend: {direction}")
+            c.drawString(left, y, f"{param} ({interp['system']})  Trend: {direction}")
+            
+            # Mini trend chart (right side)
+            has_chart = bool(focus_trends and str(param) in focus_trends)
+
+            chart_w = 120
+            chart_h = 16
+            chart_lane = 0  # how much width we reserve on the right so text never collides
+
+            if has_chart:
+                c.setLineWidth(0.6)
+                chart_x = page_w - right - chart_w
+                _draw_sparkline(
+                    c,
+                    chart_x,
+                    y,          # baseline
+                    w=chart_w,
+                    h=chart_h,
+                    values=focus_trends.get(str(param)),
+                )
+                chart_lane = chart_w + 14  # chart width + gutter padding
+
+            # Now that we know whether a chart exists, reserve space before writing wrapped text
+            wrap_width = max_width - chart_lane
+
             y -= 14
 
             y = _draw_wrapped(
                 c, left + 20, y,
                 f"Observed trend suggests: {interp['meaning']}",
-                max_width - 20,
+                wrap_width - 20,
                 line_height=13, font_name="Helvetica", font_size=10,
             )
 
             y = _draw_wrapped(
                 c, left + 20, y,
                 f"Risk classification: {interp['risk_type']}",
-                max_width - 20,
+                wrap_width - 20,
                 line_height=13, font_name="Helvetica", font_size=10,
             )
 
             y = _draw_wrapped(
                 c, left + 20, y,
                 f"Estimated time to limits: min={eta_min} | max={eta_max}",
-                max_width - 20,
+                wrap_width - 20,
                 line_height=13, font_name="Helvetica", font_size=10,
             )
 
-            y -= 10
+            c.setLineWidth(0.3)
+            c.line(left, y + 10, page_w - right, y + 10)
+
+            y -= 18
 
     # --- Footer (Page 2) ---
     _draw_footer(
