@@ -27,7 +27,8 @@ jobs:
 
       - name: Generate small dataset + PDF
         run: |
-          mkdir data outputs
+          New-Item -ItemType Directory -Force -Path data | Out-Null
+          New-Item -ItemType Directory -Force -Path outputs | Out-Null
           axiomiq-generate --out data/check.csv --days 3 --step-hours 6 --seed 1 --profile healthy
           axiomiq --input data/check.csv --out outputs/check.pdf --snapshot outputs/check_snapshot.csv
 
