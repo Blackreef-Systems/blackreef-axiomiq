@@ -1,0 +1,10 @@
+[axiomiq]
+input = "data/readings.csv"
+out = "outputs/axiomiq_report.pdf"
+snapshot = "outputs/last_snapshot.csv"
+json_out = "outputs/axiomiq_report.json"
+
+# analysis defaults
+health_drop = 2.0
+eta_compress = 7.0
+# engine = "DG3"

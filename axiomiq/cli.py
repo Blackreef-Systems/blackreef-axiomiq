@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from axiomiq.core.config import AxiomIQConfig, merge_config
 from axiomiq.core.baseline import compute_baseline
 from axiomiq.core.delta import DeltaConfig, compute_delta_lines, load_snapshot, save_snapshot, snapshot_from_fleet
 from axiomiq.core.drift import add_limit_proximity, add_slope_per_day, compute_zscore
@@ -26,6 +27,8 @@ from axiomiq.core.fleet import fleet_summary, fleet_verdict
 from axiomiq.core.ingest import load_readings_csv
 from axiomiq.core.scoring import add_risk_score, health_score, top_risks
 from axiomiq.report.pdf_report import write_pdf_report
+from axiomiq.report.json_report import write_json_report
+
 
 def _safe_trend_series(engine_slice: pd.DataFrame, param: str, n: int = 120) -> list[float]:
     """
@@ -77,48 +80,21 @@ def _console_safe(s: str) -> str:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="axiomiq",
-        description="Blackreef AxiomIQ — Fleet & engine drift analytics",
-    )
+    p = argparse.ArgumentParser(prog="axiomiq", description="Blackreef AxiomIQ — Fleet & engine drift analytics")
 
-    p.add_argument(
-        "--input",
-        default="data/readings.csv",
-        help="Path to readings CSV",
-    )
+    # Config (optional)
+    p.add_argument("--config", default=None, help="Path to config TOML (optional)")
 
-    p.add_argument(
-        "--out",
-        default="outputs/axiomiq_report.pdf",
-        help="Output PDF path",
-    )
+    # I/O
+    p.add_argument("--input", default=None, help="Path to readings CSV")
+    p.add_argument("--out", default=None, help="Output PDF path")
+    p.add_argument("--snapshot", default=None, help="Snapshot CSV path for change tracking")
+    p.add_argument("--json-out", default=None, help="Optional JSON output path (structured results)")
 
-    p.add_argument(
-        "--snapshot",
-        default="outputs/last_snapshot.csv",
-        help="Snapshot CSV path for change tracking",
-    )
-
-    p.add_argument(
-        "--engine",
-        default=None,
-        help="Force focus engine_id (e.g., DG1). Default: highest priority.",
-    )
-
-    p.add_argument(
-        "--health-drop",
-        type=float,
-        default=DEFAULT_HEALTH_DROP_TRIGGER_POINTS,
-        help=f"Delta trigger: health drop points (default {DEFAULT_HEALTH_DROP_TRIGGER_POINTS})",
-    )
-
-    p.add_argument(
-        "--eta-compress",
-        type=float,
-        default=DEFAULT_ETA_COMPRESS_TRIGGER_DAYS,
-        help=f"Delta trigger: ETA compression in days (default {DEFAULT_ETA_COMPRESS_TRIGGER_DAYS})",
-    )
+    # Analysis
+    p.add_argument("--engine", default=None, help="Force focus engine_id (e.g., DG1). Default: highest priority.")
+    p.add_argument("--health-drop", type=float, default=None, help="Delta trigger: health drop points")
+    p.add_argument("--eta-compress", type=float, default=None, help="Delta trigger: ETA compression in days")
 
     return p
 
@@ -126,9 +102,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
-    data_path = Path(args.input)
-    out_pdf = Path(args.out)
-    snapshot_path = Path(args.snapshot)
+    file_cfg = AxiomIQConfig.from_toml(args.config) if args.config else None
+    
+    # Build an "explicit CLI" dict (only set keys when user provided them)
+    cli_explicit = {}
+    if args.input is not None:
+        cli_explicit["input"] = args.input
+    if args.out is not None:
+        cli_explicit["out"] = args.out
+    if args.snapshot is not None:
+        cli_explicit["snapshot"] = args.snapshot
+    if args.json_out is not None:
+        cli_explicit["json_out"] = args.json_out
+    if args.engine is not None:
+        cli_explicit["engine"] = args.engine
+    if args.health_drop is not None:
+        cli_explicit["health_drop"] = args.health_drop
+    if args.eta_compress is not None:
+        cli_explicit["eta_compress"] = args.eta_compress
+
+    cfg = merge_config(cli_explicit, file_cfg)
+
+    data_path = Path(cfg.input)
+    out_pdf = Path(cfg.out)
+    snapshot_path = Path(cfg.snapshot)
+    json_out_path = Path(cfg.json_out) if cfg.json_out else None
 
     ingest = load_readings_csv(data_path)
     if ingest.df.empty:
@@ -150,15 +148,16 @@ def main(argv: list[str] | None = None) -> int:
     prev_snap = load_snapshot(snapshot_path)
     curr_snap = snapshot_from_fleet(fleet_df)
 
-    cfg = DeltaConfig(health_drop_points=args.health_drop, eta_compress_days=args.eta_compress)
-    delta_lines = compute_delta_lines(prev_snap, curr_snap, cfg=cfg)
+    cfg_delta = DeltaConfig(health_drop_points=cfg.health_drop, eta_compress_days=cfg.eta_compress)
+    delta_lines = compute_delta_lines(prev_snap, curr_snap, cfg=cfg_delta)
 
     # Save snapshot AFTER computing delta (so "prev" truly means last run)
     save_snapshot(curr_snap, snapshot_path)
 
     # Choose focus engine
-    if args.engine:
-        focus_engine_id = str(args.engine)
+    if cfg.engine:
+        focus_engine_id = str(cfg.engine)
+
     else:
         # Highest priority after sorting is first row
         if not fleet_df.empty and "engine_id" in fleet_df.columns:
@@ -214,16 +213,36 @@ def main(argv: list[str] | None = None) -> int:
         notes=ingest.issues,
         run_config=run_config,
     )
+    
+    if json_out_path:
+        write_json_report(
+            out_path=json_out_path,
+            generated_at=generated_at,
+            coverage_line=coverage,
+            verdict=verdict,
+            delta_lines=delta_lines,
+            focus_engine_id=focus_engine_id,
+            focus_score=round(focus_score, 1),
+            fleet_df=fleet_df,
+            focus_risks=focus_risks,
+            notes=ingest.issues,
+            run_config=run_config,
+        )
+
 
     # Prints only at main (your preference)
     print(f"Report generated: {out_pdf.resolve()}")
     print(f"Snapshot saved:  {snapshot_path.resolve()}")
     print(f"Fleet Verdict:   {_console_safe(verdict)}")
     print(f"Focus engine:    {focus_engine_id} | Health Score: {round(focus_score, 1)}")
+    
     if delta_lines:
         print("Key Changes:")
         for d in delta_lines:
             print(f" - {_console_safe(d)}")
+            
+    if json_out_path:
+        print(f"JSON saved:      {json_out_path.resolve()}")
 
     return 0
 
