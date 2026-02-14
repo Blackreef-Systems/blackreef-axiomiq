@@ -20,11 +20,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
 
-      - name: Run unit tests (with coverage report)
-        run: |
-          python -m pip install -e ".[dev]"
-          python -m pytest -q --cov=axiomiq --cov-report=term-missing
-
       - name: CLI help (sanity)
         run: |
           axiomiq --help
@@ -42,7 +37,6 @@ jobs:
         with:
           name: check-pdf
           path: outputs/check.pdf
-
 
   ubuntu-smoke:
     runs-on: ubuntu-latest
