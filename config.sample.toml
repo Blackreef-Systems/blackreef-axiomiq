@@ -1,10 +1,14 @@
 [axiomiq]
+
+# --- Required paths ---
 input = "data/readings.csv"
 out = "outputs/axiomiq_report.pdf"
 snapshot = "outputs/last_snapshot.csv"
 json_out = "outputs/axiomiq_report.json"
 
-# analysis defaults
+# --- Analysis defaults ---
 health_drop = 2.0
 eta_compress = 7.0
+
+# Optional focus engine override
 # engine = "DG3"
