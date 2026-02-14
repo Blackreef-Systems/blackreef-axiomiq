@@ -17,6 +17,11 @@ dependencies = [
   "pillow>=10.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
 [project.scripts]
 axiomiq = "axiomiq.cli:main"
 axiomiq-generate = "axiomiq.tools.generate_readings:main"

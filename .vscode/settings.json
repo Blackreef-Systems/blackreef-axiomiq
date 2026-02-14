@@ -9,6 +9,8 @@
         "numpy",
         "pagesizes",
         "pdfgen",
+        "pycache",
+        "pytest",
         "reportlab",
         "scipy",
         "setuptools",

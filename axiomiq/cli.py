@@ -27,6 +27,39 @@ from axiomiq.core.ingest import load_readings_csv
 from axiomiq.core.scoring import add_risk_score, health_score, top_risks
 from axiomiq.report.pdf_report import write_pdf_report
 
+def _safe_trend_series(engine_slice: pd.DataFrame, param: str, n: int = 120) -> list[float]:
+    """
+    Returns the last N points for a param from any available proximity-like column.
+    Sparkline normalizes defensively later, so raw-ish is OK.
+    """
+    if engine_slice.empty or "param" not in engine_slice.columns:
+        return []
+
+    s = engine_slice[engine_slice["param"] == param].copy()
+    if s.empty:
+        return []
+
+    # Prefer time ordering if present
+    if "timestamp" in s.columns:
+        s = s.sort_values("timestamp")
+
+    # Try a few likely column names (depending on your pipeline)
+    candidates = [
+        "limit_proximity",
+        "proximity",
+        "limit_prox",
+        "distance_to_limit",
+        "dist_to_limit",
+        "risk_score",  # last resort (still shows “movement”)
+        "z",
+        "zscore",
+    ]
+    col = next((c for c in candidates if c in s.columns), None)
+    if not col:
+        return []
+
+    vals = s[col].tail(n).tolist()
+    return [float(v) for v in vals if isinstance(v, (int, float))]
 
 def _console_safe(s: str) -> str:
     """
@@ -137,6 +170,12 @@ def main(argv: list[str] | None = None) -> int:
     focus_score = float(health_score(engine_slice)) if not engine_slice.empty else 0.0
     focus_risks = top_risks(engine_slice, top_n=5) if not engine_slice.empty else pd.DataFrame()
 
+    focus_trends: dict[str, list[float]] = {}
+    if not engine_slice.empty and not focus_risks.empty:
+        for p in focus_risks["param"].tolist():
+            focus_trends[str(p)] = _safe_trend_series(engine_slice, str(p), n=120)
+            
+
     # Report meta (polish)
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     # Basic coverage: date range + row count
@@ -171,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         focus_engine_id=focus_engine_id,
         focus_score=round(focus_score, 1),
         focus_risks=focus_risks,
+        focus_trends=focus_trends,
         notes=ingest.issues,
         run_config=run_config,
     )

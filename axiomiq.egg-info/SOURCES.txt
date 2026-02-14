@@ -38,3 +38,7 @@ axiomiq/report/__init__.py
 axiomiq/report/pdf_report.py
 axiomiq/tools/__init__.py
 axiomiq/tools/generate_readings.py
+tests/test_delta.py
+tests/test_drift.py
+tests/test_scoring.py
+tests/test_smoke_pipeline.py
