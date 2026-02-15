@@ -1,45 +1,68 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 
-def _df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
-    if df is None or df.empty:
-        return []
-    clean = df.copy()
-
-    # Ensure JSON-safe values
-    for col in clean.columns:
-        clean[col] = clean[col].apply(_json_safe)
-
-    return clean.to_dict(orient="records")
-
-
 def _json_safe(x: Any) -> Any:
-    # pandas/numpy scalars -> python
+    """
+    Convert values into strict JSON-safe Python types.
+    Ensures no NaN / Infinity values leak into JSON.
+    Works recursively on dict/list structures.
+    """
+
+    # Dicts (recursive)
+    if isinstance(x, dict):
+        return {str(k): _json_safe(v) for k, v in x.items()}
+
+    # Lists / tuples (recursive)
+    if isinstance(x, (list, tuple)):
+        return [_json_safe(v) for v in x]
+
+    # pandas/numpy NA handling
     try:
         if pd.isna(x):
             return None
     except Exception:
         pass
 
-    if isinstance(x, (pd.Timestamp,)):
-        return x.isoformat()
-
-    # lists of floats (sparklines) are already fine
-    if isinstance(x, (list, tuple)):
-        return [_json_safe(v) for v in x]
-
-    # numbers/strings/bools ok
-    if isinstance(x, (str, int, float, bool)) or x is None:
+    # Floats (NaN/Inf)
+    if isinstance(x, float):
+        if math.isnan(x) or math.isinf(x):
+            return None
         return x
 
-    # fallback: stringify
+    # Numpy scalars (float/int) -> python primitives
+    # (covers np.float64, np.int64, etc.)
+    if hasattr(x, "item") and callable(x.item):
+        try:
+            return _json_safe(x.item())
+        except Exception:
+            pass
+
+    # Timestamps
+    if isinstance(x, pd.Timestamp):
+        return x.isoformat()
+
+    # Primitive safe types
+    if isinstance(x, (str, int, bool)) or x is None:
+        return x
+
+    # Fallback: stringify unknown types
     return str(x)
+
+
+def _df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+    clean = df.copy()
+    for col in clean.columns:
+        clean[col] = clean[col].apply(_json_safe)
+    return clean.to_dict(orient="records")
 
 
 def write_json_report(
@@ -78,5 +101,12 @@ def write_json_report(
         "notes": notes or [],
     }
 
-    p.write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
+    # Sanitize *entire* payload recursively (kills any stray NaN anywhere)
+    payload = _json_safe(payload)
+
+    # STRICT JSON — no NaN allowed
+    p.write_text(
+        json.dumps(payload, indent=2, sort_keys=False, allow_nan=False),
+        encoding="utf-8",
+    )
     return p

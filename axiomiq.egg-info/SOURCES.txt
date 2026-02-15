@@ -5,6 +5,7 @@ pyproject.toml
 ./axiomiq/cli.py
 ./axiomiq/core/__init__.py
 ./axiomiq/core/baseline.py
+./axiomiq/core/config.py
 ./axiomiq/core/contract.py
 ./axiomiq/core/delta.py
 ./axiomiq/core/drift.py
@@ -13,6 +14,7 @@ pyproject.toml
 ./axiomiq/core/interpretation.py
 ./axiomiq/core/scoring.py
 ./axiomiq/report/__init__.py
+./axiomiq/report/json_report.py
 ./axiomiq/report/pdf_report.py
 ./axiomiq/tools/__init__.py
 ./axiomiq/tools/generate_readings.py
@@ -27,6 +29,7 @@ axiomiq.egg-info/requires.txt
 axiomiq.egg-info/top_level.txt
 axiomiq/core/__init__.py
 axiomiq/core/baseline.py
+axiomiq/core/config.py
 axiomiq/core/contract.py
 axiomiq/core/delta.py
 axiomiq/core/drift.py
@@ -35,6 +38,7 @@ axiomiq/core/ingest.py
 axiomiq/core/interpretation.py
 axiomiq/core/scoring.py
 axiomiq/report/__init__.py
+axiomiq/report/json_report.py
 axiomiq/report/pdf_report.py
 axiomiq/tools/__init__.py
 axiomiq/tools/generate_readings.py
