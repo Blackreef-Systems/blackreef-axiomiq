@@ -25,4 +25,6 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Unit tests + coverage gate
-        run: python -m pytest --cov=axiomiq --cov-report=term-missing --cov-fail-under=15
+        run: |
+          python -m pytest -q --cov=axiomiq --cov-report=term-missing --cov-fail-under=25
+
