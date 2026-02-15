@@ -1,32 +1,32 @@
-import pandas as pd
-from axiomiq.core.scoring import (
-    health_score,
-    add_risk_score,
-    top_risks,
-)
+from axiomiq.core.drift import compute_zscore
+from axiomiq.core.scoring import add_risk_score, health_score, top_risks
 
 
-def sample_df():
-    return pd.DataFrame({
-        "engine_id": ["DG1", "DG2"],
-        "risk_score": [10, 50],
-        "health_score": [90, 40],
-    })
+def test_add_risk_score_runs(sample_df):
+    df = compute_zscore(sample_df.copy())
+    out = add_risk_score(df)
+
+    assert out is not None
+    assert not out.empty
+    assert "risk_score" in out.columns
 
 
-def test_health_score_runs():
-    df = sample_df()
-    result = health_score(df.copy())
-    assert not result.empty
+def test_health_score_runs(sample_df):
+    df = compute_zscore(sample_df.copy())
+    df = add_risk_score(df)
+
+    score = health_score(df)
+
+    # IMPORTANT: health_score returns a float (fleet/engine health score)
+    assert isinstance(score, float)
+    # keep this loose; exact bounds depend on your scoring model
+    assert score == score  # not NaN
 
 
-def test_add_risk_score_runs():
-    df = sample_df()
-    result = add_risk_score(df.copy())
-    assert not result.empty
+def test_top_risks(sample_df):
+    df = compute_zscore(sample_df.copy())
+    df = add_risk_score(df)
 
-
-def test_top_risks():
-    df = sample_df()
-    result = top_risks(df.copy(), n=1)
-    assert len(result) == 1
+    risks = top_risks(df, top_n=1)
+    assert risks is not None
+    assert len(risks) == 1

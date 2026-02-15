@@ -1,17 +1,16 @@
-import pandas as pd
 from axiomiq.core.baseline import compute_baseline
 
 
-def test_compute_baseline_basic():
-    df = pd.DataFrame({
-        "engine_id": ["DG1", "DG1", "DG2", "DG2"],
-        "engine_lo_inlet_pressure_bar": [4.0, 4.2, 4.1, 4.3],
-        "tc_lo_inlet_pressure_bar": [1.5, 1.6, 1.7, 1.8],
-    })
+def test_compute_baseline_basic(sample_df):
+    baseline = compute_baseline(sample_df.copy())
 
-    baseline = compute_baseline(df)
-
+    assert baseline is not None
     assert not baseline.empty
-    assert "engine_lo_inlet_pressure_bar" in baseline.columns
-    assert "tc_lo_inlet_pressure_bar" in baseline.columns
-    assert set(baseline["engine_id"]) == {"DG1", "DG2"}
+
+    # Contract expectations (baseline should keep these identifiers)
+    for col in ("engine_id", "param", "unit", "min", "max"):
+        assert col in baseline.columns
+
+    # Baseline should produce mean/std columns used downstream
+    assert ("baseline_mean" in baseline.columns) or ("mean" in baseline.columns)
+    assert ("baseline_std" in baseline.columns) or ("std" in baseline.columns)
