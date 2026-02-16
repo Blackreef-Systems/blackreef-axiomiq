@@ -1,19 +1,67 @@
-# venv
+# =========================
+# Python / Packaging
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
 .venv/
 venv/
+ENV/
+env/
 
-# python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
+# =========================
+# Test / Coverage
+# =========================
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.coverage.*
+.tox/
+.nox/
+*.cover
+*.py,cover
 
-# local runs
+# =========================
+# Type check / Lint
+# =========================
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.pytype/
+
+# =========================
+# IDEs
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Local runs / generated artifacts
+# =========================
 data/
 outputs/
 
-# vscode
-.vscode/
+# If you generate temp snapshots locally in repo root
+*_snapshot.csv
+*_report.json
+*_report.pdf
+
+# =========================
+# Logs
+# =========================
+*.log

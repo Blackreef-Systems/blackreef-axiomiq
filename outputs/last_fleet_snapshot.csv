@@ -1,4 +1,0 @@
-engine_id,health,top_risk,eta_days,priority
-DG1,85.1,htcw_engine_outlet_temp_c,4.0,HIGH
-DG2,79.1,engine_lo_inlet_pressure_bar,,MED
-DG3,83.1,charge_air_pressure_bar,64.0,LOW

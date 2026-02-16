@@ -85,9 +85,10 @@ def _console_safe(s: str) -> str:
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="axiomiq", description="Blackreef AxiomIQ — Fleet & engine drift analytics")
 
-    p.add_argument("--input", default="data/readings.csv", help="Path to readings CSV")
-    p.add_argument("--out", default="outputs/axiomiq_report.pdf", help="Output PDF path")
-    p.add_argument("--snapshot", default="outputs/last_snapshot.csv", help="Snapshot CSV path for change tracking")
+    p.add_argument("--input", default=None, help="Path to readings CSV")
+    p.add_argument("--out", default=None, help="Output PDF path")
+    p.add_argument("--snapshot", default=None, help="Snapshot CSV path for change tracking")
+
 
     # NEW: Config file (optional)
     p.add_argument("--config", default=None, help="Path to config TOML (optional)")
@@ -137,6 +138,15 @@ def main(argv: list[str] | None = None) -> int:
 
     # Merge: CLI explicit overrides file config
     cfg = merge_config(file_cfg, cli_explicit)
+    
+    # Safety: ensure config has required defaults even if config.toml missing keys
+    if not getattr(cfg, "input", None):
+        cfg.input = "data/readings.csv"
+    if not getattr(cfg, "out", None):
+        cfg.out = "outputs/axiomiq_report.pdf"
+    if not getattr(cfg, "snapshot", None):
+        cfg.snapshot = "outputs/last_snapshot.csv"
+
 
     # Resolved analysis parameters (already final after merge)
     health_drop = float(cfg.health_drop)
