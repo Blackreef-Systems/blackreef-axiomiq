@@ -96,11 +96,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--health-drop", type=float, default=None, help="Delta trigger: health drop points")
     p.add_argument("--eta-compress", type=float, default=None, help="Delta trigger: ETA compression in days")
 
-    # NEW: report tuning (optional override)
+    # report tuning
     p.add_argument("--top-risks", type=int, default=None, help="How many focus risk indicators to render")
 
-    p.add_argument("--json", dest="json_out", default=None, help="Optional JSON report output path")
-
+    p.add_argument(
+        "--json-out",
+        "--json",
+        dest="json_out",
+        default=None,
+        help="Optional JSON report output path",
+    )
 
     return p
 
@@ -138,10 +143,30 @@ def main(argv: list[str] | None = None) -> int:
     eta_compress = float(cfg.eta_compress)
     top_n = int(cfg.top_risks)
 
-    data_path = Path(cfg.input)
-    out_pdf = Path(cfg.out)
-    snapshot_path = Path(cfg.snapshot)
-    json_out_path = Path(cfg.json_out) if cfg.json_out else None
+    # --- FINAL IO RESOLUTION (CLI FLAGS MUST WIN) ---
+    input_path = Path(args.input) if args.input else None
+    out_pdf = Path(args.out) if args.out else None
+    snapshot_path = Path(args.snapshot) if args.snapshot else None
+    json_out_path = Path(args.json_out) if getattr(args, "json_out", None) else None
+
+    # fallback to merged config
+    if input_path is None:
+        input_path = Path(cfg.input)
+    if out_pdf is None:
+        out_pdf = Path(cfg.out)
+    if snapshot_path is None:
+        snapshot_path = Path(cfg.snapshot)
+    if json_out_path is None and getattr(cfg, "json_out", None):
+        json_out_path = Path(cfg.json_out)
+
+    # ensure directories exist (critical for tmp_path tests)
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    if json_out_path is not None:
+        json_out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data_path = input_path
+
 
     ingest = load_readings_csv(data_path)
     if ingest.df.empty:
