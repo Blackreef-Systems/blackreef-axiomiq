@@ -20,21 +20,59 @@ jobs:
         with:
           python-version: "3.12"
 
-      # ---- Build a sample PDF to attach to the release ----
-      - name: Generate sample report PDF
+      - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
-          mkdir -p data outputs
-          axiomiq-generate --out data/sample.csv --days 14 --step-hours 6 --seed 1 --profile demo
-          axiomiq --input data/sample.csv --out outputs/axiomiq_sample_report.pdf --snapshot outputs/sample_snapshot.csv
 
-      # ---- Build distributables ----
+      # ---- Build distributables first ----
       - name: Build sdist + wheel
         run: |
           python -m pip install build twine
           python -m build
           python -m twine check dist/*
+
+      # ---- Guard: package version must match tag ----
+      - name: Verify package version matches tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"          # e.g. v0.1.1
+          TAG_VER="${TAG#v}"                # e.g. 0.1.1
+          PKG_VER="$(python -c "from importlib.metadata import version; print(version('axiomiq'))" 2>/dev/null || true)"
+          if [ -n "$PKG_VER" ]; then
+            echo "axiomiq already installed in runner env as $PKG_VER (unexpected)."
+          fi
+          python -m venv .venv_release_check
+          source .venv_release_check/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          INSTALLED_VER="$(python -c "from importlib.metadata import version; print(version('axiomiq'))")"
+          echo "Tag version:       $TAG_VER"
+          echo "Installed version: $INSTALLED_VER"
+          test "$INSTALLED_VER" = "$TAG_VER"
+
+      # ---- Sanity: CLI works when installed from wheel ----
+      - name: CLI help (wheel install sanity)
+        shell: bash
+        run: |
+          source .venv_release_check/bin/activate
+          axiomiq --help
+          axiomiq-generate --help
+
+      # ---- Generate sample PDF (+ JSON) using installed wheel ----
+      - name: Generate sample report artifacts (PDF + JSON)
+        shell: bash
+        run: |
+          source .venv_release_check/bin/activate
+          mkdir -p data outputs
+          axiomiq-generate --out data/sample.csv --days 14 --step-hours 6 --seed 1 --profile demo
+          axiomiq --input data/sample.csv --out outputs/axiomiq_sample_report.pdf --snapshot outputs/sample_snapshot.csv --json outputs/axiomiq_sample_report.json
+
+      # ---- Strict JSON validation on the release artifact ----
+      - name: Validate sample JSON artifact (strict)
+        shell: bash
+        run: |
+          source .venv_release_check/bin/activate
+          python -c "import json, pathlib; p=pathlib.Path('outputs/axiomiq_sample_report.json'); s=p.read_text(encoding='utf-8'); obj=json.loads(s, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f'Non-JSON constant: {x}'))); assert all(k in obj for k in ('meta','fleet','focus','notes')); print('STRICT JSON OK:', p)"
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
@@ -42,11 +80,13 @@ jobs:
           name: dist
           path: dist/*
 
-      - name: Upload sample PDF artifact
+      - name: Upload sample report artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sample-report
-          path: outputs/axiomiq_sample_report.pdf
+          path: |
+            outputs/axiomiq_sample_report.pdf
+            outputs/axiomiq_sample_report.json
 
       # ---- Create the GitHub Release and attach assets ----
       - name: Create GitHub Release + attach assets
@@ -55,4 +95,5 @@ jobs:
           files: |
             dist/*
             outputs/axiomiq_sample_report.pdf
+            outputs/axiomiq_sample_report.json
           generate_release_notes: true
