@@ -26,5 +26,5 @@ jobs:
 
       - name: Unit tests + coverage gate
         run: |
-          python -m pytest -q --cov=axiomiq --cov-report=term-missing --cov-fail-under=25
+          python -m pytest -q --cov=axiomiq --cov-report=term-missing --cov-fail-under=30
 
