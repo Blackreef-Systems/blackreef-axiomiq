@@ -85,10 +85,9 @@ def _console_safe(s: str) -> str:
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="axiomiq", description="Blackreef AxiomIQ — Fleet & engine drift analytics")
 
-    p.add_argument("--input", default=None, help="Path to readings CSV")
-    p.add_argument("--out", default=None, help="Output PDF path")
-    p.add_argument("--snapshot", default=None, help="Snapshot CSV path for change tracking")
-
+    p.add_argument("--input", default=None, help="Path to readings CSV (defaults from config or built-in)")
+    p.add_argument("--out", default=None, help="Output PDF path (defaults from config or built-in)")
+    p.add_argument("--snapshot", default=None, help="Snapshot CSV path for change tracking (defaults from config or built-in)")
 
     # NEW: Config file (optional)
     p.add_argument("--config", default=None, help="Path to config TOML (optional)")
@@ -147,35 +146,32 @@ def main(argv: list[str] | None = None) -> int:
     if not getattr(cfg, "snapshot", None):
         cfg.snapshot = "outputs/last_snapshot.csv"
 
-
     # Resolved analysis parameters (already final after merge)
     health_drop = float(cfg.health_drop)
     eta_compress = float(cfg.eta_compress)
     top_n = int(cfg.top_risks)
 
-    # --- FINAL IO RESOLUTION (CLI FLAGS MUST WIN) ---
-    input_path = Path(args.input) if args.input else None
-    out_pdf = Path(args.out) if args.out else None
-    snapshot_path = Path(args.snapshot) if args.snapshot else None
-    json_out_path = Path(args.json_out) if getattr(args, "json_out", None) else None
+    # --- FINAL IO RESOLUTION (CONFIG BASE, CLI OVERRIDES IF PROVIDED) ---
+    data_path = Path(cfg.input)
+    out_pdf = Path(cfg.out)
+    snapshot_path = Path(cfg.snapshot)
+    json_out_path = Path(cfg.json_out) if getattr(cfg, "json_out", None) else None
 
-    # fallback to merged config
-    if input_path is None:
-        input_path = Path(cfg.input)
-    if out_pdf is None:
-        out_pdf = Path(cfg.out)
-    if snapshot_path is None:
-        snapshot_path = Path(cfg.snapshot)
-    if json_out_path is None and getattr(cfg, "json_out", None):
-        json_out_path = Path(cfg.json_out)
+    # CLI overrides only if user actually provided the flag (now defaults are None)
+    if args.input is not None:
+        data_path = Path(args.input)
+    if args.out is not None:
+        out_pdf = Path(args.out)
+    if args.snapshot is not None:
+        snapshot_path = Path(args.snapshot)
+    if getattr(args, "json_out", None) is not None:
+        json_out_path = Path(args.json_out)
 
-    # ensure directories exist (critical for tmp_path tests)
+    # Ensure directories exist (critical for tmp_path + CI)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
     if json_out_path is not None:
         json_out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    data_path = input_path
 
 
     ingest = load_readings_csv(data_path)
