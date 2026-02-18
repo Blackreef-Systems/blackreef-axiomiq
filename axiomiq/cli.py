@@ -288,7 +288,6 @@ def main(argv: list[str] | None = None) -> int:
             run_config=run_config,
         )
 
-
     # Prints only at main (your preference)
     print(f"Report generated: {out_pdf.resolve()}")
     print(f"Snapshot saved:  {snapshot_path.resolve()}")
