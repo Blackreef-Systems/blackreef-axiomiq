@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackreef.io/schemas/axiomiq/axiomiq_report.schema.v1.json",
+  "title": "AxiomIQ Report JSON (Schema v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "fleet", "focus", "notes"],
+
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_at",
+        "coverage",
+        "decision_version",
+        "schema_version"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": ["string", "null"]
+        },
+        "coverage": {
+          "type": ["string", "null"]
+        },
+        "decision_version": {
+          "type": ["string", "null"]
+        },
+        "schema_version": {
+          "type": ["string", "null"]
+        },
+        "run_config": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_top_level_keys"],
+          "properties": {
+            "required_top_level_keys": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "delta", "table"],
+      "properties": {
+        "verdict": {
+          "type": "string"
+        },
+        "delta": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "table": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+
+    "focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine_id", "health_score", "risks"],
+      "properties": {
+        "engine_id": {
+          "type": "string"
+        },
+        "health_score": {
+          "type": "number"
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

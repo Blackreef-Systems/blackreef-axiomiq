@@ -6,13 +6,32 @@ from pathlib import Path
 from typing import Any
 
 
-def validate_json(path: str | Path) -> dict[str, Any]:
+def _load_schema(schema_path: Path) -> dict[str, Any]:
+    return json.loads(schema_path.read_text(encoding="utf-8"))
+
+
+def _validate_schema(payload: dict[str, Any], schema: dict[str, Any]) -> None:
+    # jsonschema is a small, stable dependency and the cleanest way to do this.
+    try:
+        import jsonschema  # type: ignore
+    except Exception as e:  # pragma: no cover
+        raise RuntimeError(
+            "jsonschema is required for schema validation. "
+            "Install with: python -m pip install jsonschema"
+        ) from e
+
+    jsonschema.validate(instance=payload, schema=schema)
+
+
+def validate_json(path: str | Path, *, schema_path: str | Path | None = None) -> None:
     """
     Strict JSON validation:
-      - Reject NaN / Infinity (JSON non-compliant constants)
-      - Require top-level keys: meta, fleet, focus, notes
-      - Basic shape sanity checks for those sections
-    Returns the parsed JSON object (dict) on success.
+      - No NaN / Infinity (parse_constant trap)
+      - Required top-level keys present
+      - Shape sanity on the required sections
+      - Optional JSON Schema validation (recommended)
+
+    Raises ValueError/RuntimeError on failure.
     """
     p = Path(path)
     s = p.read_text(encoding="utf-8")
@@ -23,41 +42,46 @@ def validate_json(path: str | Path) -> dict[str, Any]:
     )
 
     if not isinstance(obj, dict):
-        raise ValueError("Top-level JSON must be an object (dict)")
+        raise ValueError("Top-level JSON must be an object")
 
-    # Required top-level keys
-    required = ("meta", "fleet", "focus", "notes")
-    for k in required:
-        if k not in obj:
-            raise ValueError(f"Missing top-level key: {k}")
+    required = {"meta", "fleet", "focus", "notes"}
+    missing = required.difference(obj.keys())
+    if missing:
+        raise ValueError(f"Missing required top-level keys: {sorted(missing)}")
 
-    # Basic section shape sanity
     if not isinstance(obj["meta"], dict):
-        raise ValueError("meta must be an object (dict)")
+        raise ValueError("meta must be an object")
     if not isinstance(obj["fleet"], dict):
-        raise ValueError("fleet must be an object (dict)")
+        raise ValueError("fleet must be an object")
     if not isinstance(obj["focus"], dict):
-        raise ValueError("focus must be an object (dict)")
+        raise ValueError("focus must be an object")
     if not isinstance(obj["notes"], list):
-        raise ValueError("notes must be an array (list)")
+        raise ValueError("notes must be an array")
 
-    # Optional: if fleet.table exists, ensure it's a list (stable expectation for consumers)
-    fleet_table = obj["fleet"].get("table", None)
-    if fleet_table is not None and not isinstance(fleet_table, list):
-        raise ValueError("fleet.table must be an array (list) if present")
-
-    return obj
+    # Optional schema validation
+    if schema_path is not None:
+        sp = Path(schema_path)
+        schema = _load_schema(sp)
+        _validate_schema(obj, schema)
+    else:
+        # Default: validate against bundled schema v1 if present
+        bundled = Path(__file__).resolve().parents[1] / "report" / "schema" / "axiomiq_report.schema.v1.json"
+        if bundled.exists():
+            schema = _load_schema(bundled)
+            _validate_schema(obj, schema)
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(
-        prog="axiomiq-validate-json",
-        description="Validate AxiomIQ JSON output (strict: no NaN/Infinity; required keys).",
-    )
+    ap = argparse.ArgumentParser(prog="axiomiq-validate-json", description="Validate AxiomIQ JSON output (strict + schema).")
     ap.add_argument("path", help="Path to JSON report")
+    ap.add_argument(
+        "--schema",
+        default=None,
+        help="Optional schema path override. If omitted, uses bundled schema v1 when available.",
+    )
     args = ap.parse_args(argv)
 
-    validate_json(args.path)
+    validate_json(args.path, schema_path=args.schema)
     print(f"STRICT JSON OK: {Path(args.path)}")
     return 0
 

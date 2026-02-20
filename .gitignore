@@ -2,11 +2,14 @@
 # Python / Packaging
 # =========================
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 build/
 dist/
+axiomiq.egg-info/
 *.egg-info/
 .eggs/
 
@@ -65,3 +68,4 @@ outputs/
 # Logs
 # =========================
 *.log
+.vscode/

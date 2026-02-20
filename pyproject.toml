@@ -8,6 +8,7 @@ version = "0.1.2"
 description = "Blackreef AxiomIQ — fleet drift analytics for marine diesel generator sets"
 readme = "README.md"
 requires-python = ">=3.10"
+
 dependencies = [
   "pandas>=2.0",
   "numpy>=1.24",
@@ -15,20 +16,22 @@ dependencies = [
   "matplotlib>=3.7",
   "reportlab>=4.0",
   "pillow>=10.0",
+  "jsonschema>=4.20",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-cov>=4.0"
+  "pytest>=8.0",
+  "pytest-cov>=4.0",
 ]
 
 [project.scripts]
 axiomiq = "axiomiq.cli:main"
 axiomiq-generate = "axiomiq.tools.generate_readings:main"
+axiomiq-validate-json = "axiomiq.tools.validate_json:main"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
 where = ["."]

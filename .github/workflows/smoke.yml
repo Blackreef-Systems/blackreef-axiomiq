@@ -32,9 +32,9 @@ jobs:
           axiomiq-generate --out data/check.csv --days 3 --step-hours 6 --seed 1 --profile healthy
           axiomiq --input data/check.csv --out outputs/check.pdf --snapshot outputs/check_snapshot.csv --json outputs/check.json
           
-      - name: Validate JSON artifact (strict)
+      - name: Validate JSON artifact (strict + schema)
         run: |
-          python -c "import json, pathlib; p=pathlib.Path('outputs/check.json'); s=p.read_text(encoding='utf-8'); obj=json.loads(s, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f'Non-JSON constant: {x}'))); assert all(k in obj for k in ('meta','fleet','focus','notes')); print('STRICT JSON OK:', p)"
+          axiomiq-validate-json outputs/check.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -71,9 +71,9 @@ jobs:
           axiomiq-generate --out data/check.csv --days 3 --step-hours 6 --seed 1 --profile healthy
           axiomiq --input data/check.csv --out outputs/check.pdf --snapshot outputs/check_snapshot.csv --json outputs/check.json
 
-      - name: Validate JSON artifact (strict)
+      - name: Validate JSON artifact (strict + schema)
         run: |
-          python -c "import json, pathlib; p=pathlib.Path('outputs/check.json'); s=p.read_text(encoding='utf-8'); obj=json.loads(s, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f'Non-JSON constant: {x}'))); assert all(k in obj for k in ('meta','fleet','focus','notes')); print('STRICT JSON OK:', p)"
+          axiomiq-validate-json outputs/check.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

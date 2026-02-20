@@ -11,10 +11,13 @@ import pandas as pd
 def _json_safe(x: Any) -> Any:
     """
     Convert values into strict JSON-safe Python types.
-    Ensures no NaN / Infinity values leak into JSON.
-    Works recursively on dict/list structures.
-    """
 
+    Guarantees:
+    - No NaN / Infinity (converted to None)
+    - pandas/numpy NA -> None
+    - numpy scalars -> python primitives
+    - Recurses through dict/list/tuple
+    """
     # Dicts (recursive)
     if isinstance(x, dict):
         return {str(k): _json_safe(v) for k, v in x.items()}
@@ -37,7 +40,6 @@ def _json_safe(x: Any) -> Any:
         return x
 
     # Numpy scalars (float/int) -> python primitives
-    # (covers np.float64, np.int64, etc.)
     if hasattr(x, "item") and callable(x.item):
         try:
             return _json_safe(x.item())
@@ -79,14 +81,25 @@ def write_json_report(
     notes: list[str] | None,
     run_config: dict[str, str] | None,
 ) -> Path:
+    """
+    Writes the canonical AxiomIQ JSON report.
+
+    IMPORTANT:
+    - `meta` must remain schema-stable and NOT include extra keys.
+      (No `run_config`, no `contract` inside `meta`.)
+    """
     p = Path(out_path)
     p.parent.mkdir(parents=True, exist_ok=True)
+
+    decision_version = run_config.get("version") if run_config else None
+    schema_version = run_config.get("schema") if run_config else None
 
     payload: dict[str, Any] = {
         "meta": {
             "generated_at": generated_at,
             "coverage": coverage_line,
-            "run_config": run_config or {},
+            "decision_version": decision_version,
+            "schema_version": schema_version,
         },
         "fleet": {
             "verdict": verdict,
@@ -101,7 +114,7 @@ def write_json_report(
         "notes": notes or [],
     }
 
-    # Sanitize *entire* payload recursively (kills any stray NaN anywhere)
+    # Sanitize *entire* payload recursively
     payload = _json_safe(payload)
 
     # STRICT JSON — no NaN allowed

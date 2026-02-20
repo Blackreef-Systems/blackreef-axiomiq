@@ -1,9 +1,9 @@
 # scripts/demo.ps1
 
 param(
-  [switch]$Reinstall,   # re-run pip install -e .
-  [switch]$Open,        # open PDF when done
-  [switch]$InjectFailure
+  [switch]$Reinstall,     # re-run pip install -e .
+  [switch]$Open,          # open PDF when done
+  [switch]$InjectFailure  # inject correlated failure into DG3
 )
 
 Set-StrictMode -Version Latest
@@ -30,22 +30,25 @@ if ($Reinstall) {
 $READINGS  = "data/readings.csv"
 $REPORT    = "outputs/axiomiq_report.pdf"
 $SNAPSHOT  = "outputs/last_snapshot.csv"
+$JSON      = "outputs/axiomiq_report.json"
+
 $ENGINES   = "DG1,DG2,DG3,DG4,DG5,DG6"
 $START     = "2026-01-01T00:00:00"
 $DAYS      = 90
 $STEP_HRS  = 1
-$AxiomiqProfile   = "demo"
+$PROFILE   = "demo"
 $SEED      = 42
 
 # Ensure dirs exist
 New-Item -ItemType Directory -Force -Path "data"    | Out-Null
 New-Item -ItemType Directory -Force -Path "outputs" | Out-Null
 
-# ---- Sanity: console entrypoints exist ----
-# (If you didn't run -Reinstall after changes, these can disappear)
+# ---- Ensure console entrypoints exist ----
 $haveAxiomiq = Get-Command axiomiq -ErrorAction SilentlyContinue
 $haveGen     = Get-Command axiomiq-generate -ErrorAction SilentlyContinue
-if (-not $haveAxiomiq -or -not $haveGen) {
+$haveValidate= Get-Command axiomiq-validate-json -ErrorAction SilentlyContinue
+
+if (-not $haveAxiomiq -or -not $haveGen -or -not $haveValidate) {
   Write-Host "Console commands missing. Running editable install..." -ForegroundColor Yellow
   python -m pip install -e . | Out-Null
 }
@@ -58,7 +61,7 @@ if ($InjectFailure) {
     --days $DAYS `
     --step-hours $STEP_HRS `
     --engines $ENGINES `
-    --profile $AxiomiqProfile `
+    --profile $PROFILE `
     --seed $SEED `
     --inject-failure `
     --failure-engine "DG3" `
@@ -67,26 +70,32 @@ if ($InjectFailure) {
     --failure-severity 0.8 `
     --failure-mode air_intake_restriction `
     --print-summary
-} else {
+}
+else {
   axiomiq-generate `
     --out $READINGS `
     --start $START `
     --days $DAYS `
     --step-hours $STEP_HRS `
     --engines $ENGINES `
-    --profile $AxiomiqProfile `
+    --profile $PROFILE `
     --seed $SEED `
     --print-summary
 }
 
-# ---- Run analysis + PDF ----
+# ---- Run analysis + PDF + JSON ----
 axiomiq `
   --input $READINGS `
   --out $REPORT `
-  --snapshot $SNAPSHOT
+  --snapshot $SNAPSHOT `
+  --json $JSON
+
+# ---- Strict JSON validation (fail hard if invalid) ----
+axiomiq-validate-json $JSON
 
 Write-Host ""
-Write-Host "DONE -> $REPORT"
+Write-Host "PDF  -> $REPORT"
+Write-Host "JSON -> $JSON"
 Write-Host "SNAP -> $SNAPSHOT"
 
 if ($Open) {
