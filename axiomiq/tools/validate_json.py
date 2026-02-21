@@ -113,10 +113,17 @@ def validate_json(path: str | Path, *, expected_schema_version: str = EXPECTED_S
 
 def main() -> None:
     import argparse
+    import sys
 
     parser = argparse.ArgumentParser(description="Validate AxiomIQ JSON report.")
     parser.add_argument("path", help="Path to JSON report file")
     args = parser.parse_args()
 
-    validate_json(args.path)
-    print("JSON validation passed.")
+    try:
+        validate_json(args.path)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        raise SystemExit(1) from e
+
+    print("OK: JSON validation passed (strict + schema).")
+    raise SystemExit(0)
