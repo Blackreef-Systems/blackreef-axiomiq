@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib import resources
+
 import argparse
 import json
 from pathlib import Path
@@ -8,6 +10,15 @@ from typing import Any
 
 def _load_schema(schema_path: Path) -> dict[str, Any]:
     return json.loads(schema_path.read_text(encoding="utf-8"))
+
+
+def _load_schema_v1() -> dict[str, Any]:
+    raw = (
+        resources.files("axiomiq.report.schema")
+        .joinpath("axiomiq_report.schema.v1.json")
+        .read_text(encoding="utf-8")
+    )
+    return json.loads(raw)
 
 
 def _validate_schema(payload: dict[str, Any], schema: dict[str, Any]) -> None:
@@ -29,7 +40,7 @@ def validate_json(path: str | Path, *, schema_path: str | Path | None = None) ->
       - No NaN / Infinity (parse_constant trap)
       - Required top-level keys present
       - Shape sanity on the required sections
-      - Optional JSON Schema validation (recommended)
+      - JSON Schema validation (bundled v1 by default)
 
     Raises ValueError/RuntimeError on failure.
     """
@@ -38,7 +49,9 @@ def validate_json(path: str | Path, *, schema_path: str | Path | None = None) ->
 
     obj = json.loads(
         s,
-        parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f"Non-JSON constant: {x}")),
+        parse_constant=lambda x: (_ for _ in ()).throw(
+            ValueError(f"Non-JSON constant: {x}")
+        ),
     )
 
     if not isinstance(obj, dict):
@@ -58,26 +71,25 @@ def validate_json(path: str | Path, *, schema_path: str | Path | None = None) ->
     if not isinstance(obj["notes"], list):
         raise ValueError("notes must be an array")
 
-    # Optional schema validation
-    if schema_path is not None:
-        sp = Path(schema_path)
-        schema = _load_schema(sp)
-        _validate_schema(obj, schema)
+    # --- Schema validation (always enforced) ---
+    if schema_path is None:
+        schema = _load_schema_v1()
     else:
-        # Default: validate against bundled schema v1 if present
-        bundled = Path(__file__).resolve().parents[1] / "report" / "schema" / "axiomiq_report.schema.v1.json"
-        if bundled.exists():
-            schema = _load_schema(bundled)
-            _validate_schema(obj, schema)
+        schema = _load_schema(Path(schema_path))
+
+    _validate_schema(obj, schema)
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="axiomiq-validate-json", description="Validate AxiomIQ JSON output (strict + schema).")
+    ap = argparse.ArgumentParser(
+        prog="axiomiq-validate-json",
+        description="Validate AxiomIQ JSON output (strict + schema).",
+    )
     ap.add_argument("path", help="Path to JSON report")
     ap.add_argument(
         "--schema",
         default=None,
-        help="Optional schema path override. If omitted, uses bundled schema v1 when available.",
+        help="Optional schema path override. If omitted, uses bundled schema v1.",
     )
     args = ap.parse_args(argv)
 
