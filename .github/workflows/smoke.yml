@@ -24,6 +24,7 @@ jobs:
         run: |
           axiomiq --help
           axiomiq-generate --help
+          axiomiq-validate-json --help
 
       - name: Generate small dataset + PDF + JSON
         run: |
@@ -31,15 +32,36 @@ jobs:
           New-Item -ItemType Directory -Force -Path outputs | Out-Null
           axiomiq-generate --out data/check.csv --days 3 --step-hours 6 --seed 1 --profile healthy
           axiomiq --input data/check.csv --out outputs/check.pdf --snapshot outputs/check_snapshot.csv --json outputs/check.json
-          
-      - name: Validate JSON artifact (strict + schema)
+
+      - name: Validate JSON artifact (editable install)
+        run: |
+          axiomiq-validate-json outputs/check.json
+
+      # --- Prove packaging: wheel includes schemas + entrypoints work ---
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel
+
+      - name: Install wheel (clean)
+        run: |
+          python -m pip uninstall -y axiomiq
+          python -m pip install dist\*.whl
+
+      - name: CLI help (wheel)
+        run: |
+          axiomiq --help
+          axiomiq-generate --help
+          axiomiq-validate-json --help
+
+      - name: Validate JSON artifact (wheel install)
         run: |
           axiomiq-validate-json outputs/check.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: check-artifacts
+          name: check-artifacts-windows
           path: |
             outputs/check.pdf
             outputs/check.json
@@ -64,6 +86,7 @@ jobs:
         run: |
           axiomiq --help
           axiomiq-generate --help
+          axiomiq-validate-json --help
 
       - name: Generate small dataset + PDF + JSON
         run: |
@@ -71,7 +94,28 @@ jobs:
           axiomiq-generate --out data/check.csv --days 3 --step-hours 6 --seed 1 --profile healthy
           axiomiq --input data/check.csv --out outputs/check.pdf --snapshot outputs/check_snapshot.csv --json outputs/check.json
 
-      - name: Validate JSON artifact (strict + schema)
+      - name: Validate JSON artifact (editable install)
+        run: |
+          axiomiq-validate-json outputs/check.json
+
+      # --- Prove packaging: wheel includes schemas + entrypoints work ---
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel
+
+      - name: Install wheel (clean)
+        run: |
+          python -m pip uninstall -y axiomiq
+          python -m pip install dist/*.whl
+
+      - name: CLI help (wheel)
+        run: |
+          axiomiq --help
+          axiomiq-generate --help
+          axiomiq-validate-json --help
+
+      - name: Validate JSON artifact (wheel install)
         run: |
           axiomiq-validate-json outputs/check.json
 
