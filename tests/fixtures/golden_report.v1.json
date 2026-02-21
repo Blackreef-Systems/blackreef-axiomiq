@@ -1,0 +1,132 @@
+{
+  "fleet": {
+    "delta": [
+      "Baseline created (first run). Future reports will highlight changes."
+    ],
+    "table": [
+      {
+        "action": "Sched next maint",
+        "engine_id": "DG1",
+        "eta_days": 17.0,
+        "health": 81.4,
+        "priority": "MED",
+        "reason": "ETA 17.0d to limit (charge_air_pressure_bar).",
+        "top_risk": "charge_air_pressure_bar",
+        "trend": [
+          0.11999999999999998,
+          0.12857142857142861,
+          0.10857142857142854,
+          0.08571428571428566,
+          0.10857142857142854,
+          0.10571428571428575,
+          0.08857142857142859,
+          0.12857142857142861,
+          0.11714285714285719,
+          0.10000000000000002,
+          0.11142857142857146,
+          0.1257142857142857
+        ]
+      },
+      {
+        "action": "Sched next maint",
+        "engine_id": "DG3",
+        "eta_days": 8.5,
+        "health": 81.8,
+        "priority": "MED",
+        "reason": "ETA 8.5d to limit (charge_air_pressure_bar).",
+        "top_risk": "charge_air_pressure_bar",
+        "trend": [
+          0.0971428571428571,
+          0.07999999999999995,
+          0.0942857142857143,
+          0.0942857142857143,
+          0.11714285714285719,
+          0.08571428571428566,
+          0.11428571428571425,
+          0.11714285714285719,
+          0.07428571428571422,
+          0.10285714285714283,
+          0.08571428571428566,
+          0.0971428571428571
+        ]
+      },
+      {
+        "action": "Monitor (30d)",
+        "engine_id": "DG2",
+        "eta_days": 83.6,
+        "health": 79.5,
+        "priority": "LOW",
+        "reason": "ETA 83.6d to limit (htcw_engine_outlet_temp_c).",
+        "top_risk": "htcw_engine_outlet_temp_c",
+        "trend": [
+          0.08633333333333329,
+          0.08688888888888881,
+          0.08888888888888889,
+          0.0867777777777778,
+          0.08666666666666664,
+          0.08688888888888881,
+          0.08466666666666672,
+          0.09077777777777779,
+          0.0901111111111111,
+          0.08444444444444438,
+          0.08966666666666659,
+          0.08988888888888892
+        ]
+      }
+    ],
+    "verdict": "DG1, DG3 shows degradation and should be scheduled for inspection. DG2 remains healthy."
+  },
+  "focus": {
+    "engine_id": "DG1",
+    "health_score": 81.4,
+    "risks": [
+      {
+        "direction": "\u2193",
+        "engine_id": "DG1",
+        "eta_to_max_days": null,
+        "eta_to_min_days": 17.00000000000003,
+        "max_risk": 0.4766354144215447,
+        "param": "charge_air_pressure_bar"
+      },
+      {
+        "direction": "\u2191",
+        "engine_id": "DG1",
+        "eta_to_max_days": 116.49999999999562,
+        "eta_to_min_days": null,
+        "max_risk": 0.46551956375709846,
+        "param": "lo_inlet_temp_c"
+      },
+      {
+        "direction": "\u2193",
+        "engine_id": "DG1",
+        "eta_to_max_days": null,
+        "eta_to_min_days": 136.48333333333463,
+        "max_risk": 0.43154065934965813,
+        "param": "htcw_engine_outlet_temp_c"
+      },
+      {
+        "direction": "\u2193",
+        "engine_id": "DG1",
+        "eta_to_max_days": null,
+        "eta_to_min_days": 29.999999999997957,
+        "max_risk": 0.37115105781288116,
+        "param": "engine_lo_inlet_pressure_bar"
+      },
+      {
+        "direction": "\u2192",
+        "engine_id": "DG1",
+        "eta_to_max_days": null,
+        "eta_to_min_days": null,
+        "max_risk": 0.2555952380952379,
+        "param": "tc_lo_inlet_pressure_bar"
+      }
+    ]
+  },
+  "meta": {
+    "coverage": "Coverage: 2026-01-01 -> 2026-01-03 | Samples: 180 | Engines: 3",
+    "decision_version": "0.1.3",
+    "generated_at": "<redacted>",
+    "schema_version": "v1"
+  },
+  "notes": []
+}
