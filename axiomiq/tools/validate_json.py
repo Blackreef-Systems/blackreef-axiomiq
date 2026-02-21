@@ -110,3 +110,13 @@ def validate_json(path: str | Path, *, expected_schema_version: str = EXPECTED_S
     jsonschema.validate(instance=data, schema=schema)
 
     return ValidationResult(ok=True, schema_version=actual)
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Validate AxiomIQ JSON report.")
+    parser.add_argument("path", help="Path to JSON report file")
+    args = parser.parse_args()
+
+    validate_json(args.path)
+    print("JSON validation passed.")
