@@ -10,29 +10,19 @@
     "meta": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "generated_at",
-        "coverage",
-        "decision_version",
-        "schema_version"
-      ],
+      "required": ["generated_at", "coverage", "decision_version", "schema_version"],
       "properties": {
-        "generated_at": {
-          "type": ["string", "null"]
-        },
-        "coverage": {
-          "type": ["string", "null"]
-        },
-        "decision_version": {
-          "type": ["string", "null"]
-        },
-        "schema_version": {
-          "type": ["string", "null"]
-        },
+        "generated_at": { "type": "string" },
+        "coverage": { "type": "string" },
+        "decision_version": { "type": "string" },
+
+        "schema_version": { "type": "string", "const": "v1" },
+
         "run_config": {
           "type": "object",
           "additionalProperties": true
         },
+
         "contract": {
           "type": "object",
           "additionalProperties": false,
@@ -52,9 +42,7 @@
       "additionalProperties": false,
       "required": ["verdict", "delta", "table"],
       "properties": {
-        "verdict": {
-          "type": "string"
-        },
+        "verdict": { "type": "string" },
         "delta": {
           "type": "array",
           "items": { "type": "string" }
@@ -74,12 +62,8 @@
       "additionalProperties": false,
       "required": ["engine_id", "health_score", "risks"],
       "properties": {
-        "engine_id": {
-          "type": "string"
-        },
-        "health_score": {
-          "type": "number"
-        },
+        "engine_id": { "type": "string" },
+        "health_score": { "type": "number" },
         "risks": {
           "type": "array",
           "items": {

@@ -36,3 +36,6 @@ package-dir = { "" = "." }
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["axiomiq*"]
+
+[tool.setuptools.package-data]
+axiomiq = ["report/schema/*.json", "schema/*.json"]
