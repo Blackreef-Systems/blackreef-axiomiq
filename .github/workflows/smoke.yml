@@ -44,9 +44,12 @@ jobs:
           python -m build --wheel
 
       - name: Install wheel (clean)
+        shell: pwsh
         run: |
           python -m pip uninstall -y axiomiq
-          python -m pip install dist\*.whl
+          $whl = Get-ChildItem -Path dist -Filter *.whl | Select-Object -First 1
+          if (-not $whl) { throw "No wheel found in dist/" }
+          python -m pip install $whl.FullName
 
       - name: CLI help (wheel)
         run: |
