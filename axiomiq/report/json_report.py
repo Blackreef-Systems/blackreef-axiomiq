@@ -1,4 +1,5 @@
 from __future__ import annotations
+from axiomiq.tools.validate_json import EXPECTED_SCHEMA_VERSION
 
 import json
 import math
@@ -99,7 +100,7 @@ def write_json_report(
             "generated_at": generated_at,
             "coverage": coverage_line,
             "decision_version": decision_version,
-            "schema_version": schema_version,
+            "schema_version": EXPECTED_SCHEMA_VERSION,
         },
         "fleet": {
             "verdict": verdict,
