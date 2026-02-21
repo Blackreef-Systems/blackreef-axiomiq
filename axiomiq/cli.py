@@ -3,17 +3,19 @@ from __future__ import annotations
 from typing import Any
 
 from axiomiq.core.contract import (
-    AXIOMIQ_DECISION_VERSION,
     DEFAULT_ETA_COMPRESS_TRIGGER_DAYS,
     DEFAULT_HEALTH_DROP_TRIGGER_POINTS,
 )
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 try:
-    AXIOMIQ_DECISION_VERSION = version("axiomiq")
+    AXIOMIQ_PACKAGE_VERSION = version("axiomiq")
 except PackageNotFoundError:
-    AXIOMIQ_DECISION_VERSION = "dev"
+    AXIOMIQ_PACKAGE_VERSION = "dev"
+
+# Keep naming explicit: decision engine version vs package version.
+AXIOMIQ_DECISION_VERSION = AXIOMIQ_PACKAGE_VERSION
 
 import argparse
 from datetime import datetime
@@ -21,6 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from axiomiq.schema_constants import SCHEMA_VERSION
 from axiomiq.core.config import load_config
 from axiomiq.core.config import AxiomIQConfig, merge_config
 from axiomiq.core.baseline import compute_baseline
@@ -81,6 +84,11 @@ def _console_safe(s: str) -> str:
         .replace("⚠", "!")
     )
 
+def _require_existing_file(path: Path, label: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"{label} not found: {path}")
+    if path.is_dir():
+        raise IsADirectoryError(f"{label} is a directory, expected a file: {path}")
 
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="axiomiq", description="Blackreef AxiomIQ — Fleet & engine drift analytics")
@@ -173,10 +181,21 @@ def main(argv: list[str] | None = None) -> int:
     if json_out_path is not None:
         json_out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # ---- Fail fast: missing input should be explicit (not "No data loaded") ----
+    try:
+        _require_existing_file(data_path, "Input CSV")
+    except (FileNotFoundError, IsADirectoryError) as e:
+        print(f"ERROR: {e}")
+        return 2
 
     ingest = load_readings_csv(data_path)
     if ingest.df.empty:
-        print("No data loaded.")
+        # Provide actionable context for debugging and CI logs
+        print(f"ERROR: input CSV parsed to 0 rows: {data_path}")
+        if getattr(ingest, "issues", None):
+            print("Ingest issues:")
+            for msg in ingest.issues:
+                print(f" - {_console_safe(str(msg))}")
         return 1
 
     # Build full drift table (ALL engines)
@@ -246,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # 🔎 Config / schema visibility
         "config": str(getattr(args, "config", "") or ""),
-        "schema": str(getattr(cfg, "schema_version", "")),
+        "schema": SCHEMA_VERSION,
 
         # 🧠 Analysis parameters (resolved values, not defaults)
         "health_drop": str(health_drop),
