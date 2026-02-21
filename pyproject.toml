@@ -31,11 +31,14 @@ axiomiq-generate = "axiomiq.tools.generate_readings:main"
 axiomiq-validate-json = "axiomiq.tools.validate_json:main"
 
 [tool.setuptools]
-package-dir = { "" = "." }
+package-dir = {"" = "."}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["axiomiq*"]
 
+# IMPORTANT: include schema JSON in built wheels/sdists.
+# Schema files live under axiomiq/schemas/*.json.
 [tool.setuptools.package-data]
-axiomiq = ["report/schema/*.json", "schema/*.json"]
+"axiomiq" = ["schemas/*.json"]
