@@ -1,102 +1,112 @@
 from __future__ import annotations
 
-from importlib import resources
-
-import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import importlib.resources as resources
 
-def _load_schema(schema_path: Path) -> dict[str, Any]:
-    return json.loads(schema_path.read_text(encoding="utf-8"))
-
-
-def _load_schema_v1() -> dict[str, Any]:
-    raw = (
-        resources.files("axiomiq.report.schema")
-        .joinpath("axiomiq_report.schema.v1.json")
-        .read_text(encoding="utf-8")
-    )
-    return json.loads(raw)
+try:
+    import jsonschema
+except ImportError as e:  # pragma: no cover
+    raise ImportError(
+        "jsonschema is required for schema validation. Install with: pip install jsonschema"
+    ) from e
 
 
-def _validate_schema(payload: dict[str, Any], schema: dict[str, Any]) -> None:
-    # jsonschema is a small, stable dependency and the cleanest way to do this.
-    try:
-        import jsonschema  # type: ignore
-    except Exception as e:  # pragma: no cover
-        raise RuntimeError(
-            "jsonschema is required for schema validation. "
-            "Install with: python -m pip install jsonschema"
-        ) from e
+from axiomiq.schema_constants import (
+    SCHEMA_VERSION,
+    SCHEMA_RESOURCE_PACKAGE,
+    SCHEMA_RESOURCE_NAME,
+)
 
-    jsonschema.validate(instance=payload, schema=schema)
+EXPECTED_SCHEMA_VERSION = SCHEMA_VERSION
 
 
-def validate_json(path: str | Path, *, schema_path: str | Path | None = None) -> None:
+class StrictJsonError(ValueError):
+    """Raised when JSON is invalid or contains forbidden constants (NaN/Infinity)."""
+
+
+class SchemaVersionMismatch(ValueError):
+    """Raised when meta.schema_version does not match EXPECTED_SCHEMA_VERSION."""
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    ok: bool
+    schema_version: str
+
+
+def _reject_nonfinite_constants(value: str) -> Any:
     """
-    Strict JSON validation:
-      - No NaN / Infinity (parse_constant trap)
-      - Required top-level keys present
-      - Shape sanity on the required sections
-      - JSON Schema validation (bundled v1 by default)
+    json.loads hook: reject NaN/Infinity/-Infinity.
+    Python's stdlib json will otherwise accept them and produce floats.
+    """
+    raise StrictJsonError(f"Forbidden JSON constant encountered: {value}")
 
-    Raises ValueError/RuntimeError on failure.
+
+def _load_schema_text() -> str:
+    """
+    Load the bundled schema from package resources (no filesystem dependency).
+    """
+    return resources.files(SCHEMA_RESOURCE_PACKAGE).joinpath(SCHEMA_RESOURCE_NAME).read_text(
+        encoding="utf-8"
+    )
+
+
+def _parse_strict_json(text: str) -> dict[str, Any]:
+    """
+    Strict JSON parsing:
+      - reject NaN/Infinity
+      - reject invalid JSON
+    """
+    try:
+        data = json.loads(text, parse_constant=_reject_nonfinite_constants)
+    except StrictJsonError:
+        raise
+    except json.JSONDecodeError as e:
+        raise StrictJsonError(f"Invalid JSON: {e.msg} (line {e.lineno}, col {e.colno})") from e
+
+    if not isinstance(data, dict):
+        raise StrictJsonError("Top-level JSON must be an object.")
+    return data
+
+
+def _extract_schema_version(data: dict[str, Any]) -> str:
+    meta = data.get("meta")
+    if not isinstance(meta, dict):
+        raise SchemaVersionMismatch("Missing or invalid 'meta' object.")
+    v = meta.get("schema_version")
+    if not isinstance(v, str) or not v.strip():
+        raise SchemaVersionMismatch("Missing or invalid 'meta.schema_version' (must be a non-empty string).")
+    return v.strip()
+
+
+def validate_json(path: str | Path, *, expected_schema_version: str = EXPECTED_SCHEMA_VERSION) -> ValidationResult:
+    """
+    Validate an AxiomIQ report JSON file by:
+      1) strict JSON parse (reject NaN/Infinity)
+      2) JSON Schema validation (bundled schema)
+      3) hard-lock meta.schema_version to expected version
     """
     p = Path(path)
-    s = p.read_text(encoding="utf-8")
+    if not p.exists():
+        raise FileNotFoundError(str(p))
 
-    obj = json.loads(
-        s,
-        parse_constant=lambda x: (_ for _ in ()).throw(
-            ValueError(f"Non-JSON constant: {x}")
-        ),
-    )
+    text = p.read_text(encoding="utf-8")
+    data = _parse_strict_json(text)
 
-    if not isinstance(obj, dict):
-        raise ValueError("Top-level JSON must be an object")
+    # ---- Extract + hard-lock schema version FIRST ----
+    actual = _extract_schema_version(data)
+    if actual != expected_schema_version:
+        raise SchemaVersionMismatch(
+            f"Schema version mismatch: expected '{expected_schema_version}', got '{actual}'."
+        )
 
-    required = {"meta", "fleet", "focus", "notes"}
-    missing = required.difference(obj.keys())
-    if missing:
-        raise ValueError(f"Missing required top-level keys: {sorted(missing)}")
+    # ---- Then validate against bundled schema ----
+    schema_text = _load_schema_text()
+    schema = _parse_strict_json(schema_text)
+    jsonschema.validate(instance=data, schema=schema)
 
-    if not isinstance(obj["meta"], dict):
-        raise ValueError("meta must be an object")
-    if not isinstance(obj["fleet"], dict):
-        raise ValueError("fleet must be an object")
-    if not isinstance(obj["focus"], dict):
-        raise ValueError("focus must be an object")
-    if not isinstance(obj["notes"], list):
-        raise ValueError("notes must be an array")
-
-    # --- Schema validation (always enforced) ---
-    if schema_path is None:
-        schema = _load_schema_v1()
-    else:
-        schema = _load_schema(Path(schema_path))
-
-    _validate_schema(obj, schema)
-
-
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(
-        prog="axiomiq-validate-json",
-        description="Validate AxiomIQ JSON output (strict + schema).",
-    )
-    ap.add_argument("path", help="Path to JSON report")
-    ap.add_argument(
-        "--schema",
-        default=None,
-        help="Optional schema path override. If omitted, uses bundled schema v1.",
-    )
-    args = ap.parse_args(argv)
-
-    validate_json(args.path, schema_path=args.schema)
-    print(f"STRICT JSON OK: {Path(args.path)}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    return ValidationResult(ok=True, schema_version=actual)
