@@ -8,7 +8,7 @@ from axiomiq.cli import main as cli_main
 from axiomiq.tools.generate_readings import generate_csv
 
 
-def _run_case(tmp_path: Path, profile: str) -> float:
+def _fleet_min_health(tmp_path: Path, profile: str) -> float:
     data_dir = tmp_path / profile
     out_dir = tmp_path / f"{profile}_out"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -34,20 +34,30 @@ def _run_case(tmp_path: Path, profile: str) -> float:
 
     rc = cli_main(
         [
-            "--input", str(readings),
-            "--out", str(pdf_out),
-            "--snapshot", str(snap_out),
-            "--json", str(json_out),
+            "--input",
+            str(readings),
+            "--out",
+            str(pdf_out),
+            "--snapshot",
+            str(snap_out),
+            "--json",
+            str(json_out),
         ]
     )
     assert rc == 0
+    assert json_out.exists()
 
     data = json.loads(json_out.read_text(encoding="utf-8"))
-    return float(data["fleet"]["risk_score"])
+    table = data["fleet"]["table"]
+    assert isinstance(table, list) and table, "fleet.table must be a non-empty list"
+
+    healths = [float(row["health"]) for row in table]
+    return min(healths)
 
 
-def test_failure_profile_increases_risk(tmp_path: Path) -> None:
-    healthy_score = _run_case(tmp_path, profile="healthy")
-    degraded_score = _run_case(tmp_path, profile="degraded")
+def test_degraded_profile_reduces_worst_engine_health(tmp_path: Path) -> None:
+    healthy_min = _fleet_min_health(tmp_path, profile="healthy")
+    degraded_min = _fleet_min_health(tmp_path, profile="degraded")
 
-    assert degraded_score > healthy_score
+    # Degraded should be strictly worse (lower health) than healthy.
+    assert degraded_min < healthy_min
