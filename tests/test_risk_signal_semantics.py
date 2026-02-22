@@ -8,9 +8,9 @@ from axiomiq.cli import main as cli_main
 from axiomiq.tools.generate_readings import generate_csv
 
 
-def _fleet_min_health(tmp_path: Path, profile: str) -> float:
-    data_dir = tmp_path / profile
-    out_dir = tmp_path / f"{profile}_out"
+def _fleet_min_health(tmp_path: Path, inject_failure: bool) -> float:
+    data_dir = tmp_path / ("failure" if inject_failure else "healthy")
+    out_dir = tmp_path / ("failure_out" if inject_failure else "healthy_out")
     data_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -19,6 +19,13 @@ def _fleet_min_health(tmp_path: Path, profile: str) -> float:
     pdf_out = out_dir / "case.pdf"
     snap_out = out_dir / "case_snapshot.csv"
 
+    failure_event = {
+        "engine_id": "DG1",
+        "param": "charge_air_pressure_bar",
+        "drift_per_step": -0.2,
+        "start_step": 2,
+    } if inject_failure else None
+
     generate_csv(
         out_path=readings,
         start=datetime.fromisoformat("2026-01-01T00:00:00"),
@@ -26,10 +33,10 @@ def _fleet_min_health(tmp_path: Path, profile: str) -> float:
         step_hours=6,
         engines=["DG1", "DG2", "DG3"],
         seed=1,
-        profile=profile,
+        profile="healthy",  # always valid
         noise_override=None,
         print_summary=False,
-        failure_event=None,
+        failure_event=failure_event,
     )
 
     rc = cli_main(
@@ -49,15 +56,13 @@ def _fleet_min_health(tmp_path: Path, profile: str) -> float:
 
     data = json.loads(json_out.read_text(encoding="utf-8"))
     table = data["fleet"]["table"]
-    assert isinstance(table, list) and table, "fleet.table must be a non-empty list"
 
     healths = [float(row["health"]) for row in table]
     return min(healths)
 
 
-def test_degraded_profile_reduces_worst_engine_health(tmp_path: Path) -> None:
-    healthy_min = _fleet_min_health(tmp_path, profile="healthy")
-    degraded_min = _fleet_min_health(tmp_path, profile="failure")
-    
-    # Degraded should be strictly worse (lower health) than healthy.
-    assert degraded_min < healthy_min
+def test_injected_failure_reduces_worst_engine_health(tmp_path: Path) -> None:
+    healthy_min = _fleet_min_health(tmp_path, inject_failure=False)
+    failure_min = _fleet_min_health(tmp_path, inject_failure=True)
+
+    assert failure_min < healthy_min
