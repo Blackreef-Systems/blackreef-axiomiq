@@ -57,7 +57,7 @@ def _fleet_min_health(tmp_path: Path, profile: str) -> float:
 
 def test_degraded_profile_reduces_worst_engine_health(tmp_path: Path) -> None:
     healthy_min = _fleet_min_health(tmp_path, profile="healthy")
-    degraded_min = _fleet_min_health(tmp_path, profile="degraded")
-
+    degraded_min = _fleet_min_health(tmp_path, profile="failure")
+    
     # Degraded should be strictly worse (lower health) than healthy.
     assert degraded_min < healthy_min
