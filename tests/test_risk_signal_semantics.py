@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 from axiomiq.cli import main as cli_main
-from axiomiq.tools.generate_readings import generate_csv
+from axiomiq.tools.generate_readings import FailureEvent, generate_csv
 
 
-def _fleet_min_health(tmp_path: Path, inject_failure: bool) -> float:
+def _engine_health(tmp_path: Path, inject_failure: bool, engine_id: str) -> float:
     data_dir = tmp_path / ("failure" if inject_failure else "healthy")
     out_dir = tmp_path / ("failure_out" if inject_failure else "healthy_out")
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -19,12 +19,17 @@ def _fleet_min_health(tmp_path: Path, inject_failure: bool) -> float:
     pdf_out = out_dir / "case.pdf"
     snap_out = out_dir / "case_snapshot.csv"
 
-    failure_event = {
-        "engine_id": "DG1",
-        "param": "charge_air_pressure_bar",
-        "drift_per_step": -0.2,
-        "start_step": 2,
-    } if inject_failure else None
+    failure_event = (
+        FailureEvent(
+            mode="air_intake_restriction",
+            engine_id="DG1",
+            start_day=0,
+            ramp_days=1,
+            severity=0.9,
+        )
+        if inject_failure
+        else None
+    )
 
     generate_csv(
         out_path=readings,
@@ -33,7 +38,7 @@ def _fleet_min_health(tmp_path: Path, inject_failure: bool) -> float:
         step_hours=6,
         engines=["DG1", "DG2", "DG3"],
         seed=1,
-        profile="healthy",  # always valid
+        profile="healthy",
         noise_override=None,
         print_summary=False,
         failure_event=failure_event,
@@ -57,12 +62,15 @@ def _fleet_min_health(tmp_path: Path, inject_failure: bool) -> float:
     data = json.loads(json_out.read_text(encoding="utf-8"))
     table = data["fleet"]["table"]
 
-    healths = [float(row["health"]) for row in table]
-    return min(healths)
+    for row in table:
+        if row["engine_id"] == engine_id:
+            return float(row["health"])
+
+    raise AssertionError(f"Engine {engine_id} not found in output")
 
 
-def test_injected_failure_reduces_worst_engine_health(tmp_path: Path) -> None:
-    healthy_min = _fleet_min_health(tmp_path, inject_failure=False)
-    failure_min = _fleet_min_health(tmp_path, inject_failure=True)
+def test_injected_failure_reduces_target_engine_health(tmp_path: Path) -> None:
+    healthy_health = _engine_health(tmp_path, inject_failure=False, engine_id="DG1")
+    failure_health = _engine_health(tmp_path, inject_failure=True, engine_id="DG1")
 
-    assert failure_min < healthy_min
+    assert failure_health < healthy_health
