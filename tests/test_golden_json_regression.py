@@ -58,6 +58,11 @@ def test_golden_json_regression(tmp_path: Path) -> None:
     assert json_out.exists()
 
     got = json.loads(json_out.read_text(encoding="utf-8"))
+
+    # --- Contract invariants (raw output) ---
+    assert got["meta"]["schema_version"] == "v1"
+    assert isinstance(got["meta"]["decision_version"], str)
+
     got_n = normalize_report_json(got)
 
     if not GOLDEN.exists():
