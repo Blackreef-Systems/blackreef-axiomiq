@@ -7,7 +7,29 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from axiomiq.core.interpretation import interpret_param
+from axiomiq.report.signal_catalog import signal_display_name
 
+def _signal_labels(key: str) -> tuple[str, str, str]:
+    """
+    Return (primary_long, short_label, raw_key).
+
+    signal_display_name() returns:
+      primary_long: human long name
+      secondary: "SHORT • raw_key"
+    We extract SHORT + raw_key so tables can stay compact.
+    """
+    primary, secondary = signal_display_name(key)
+    short = primary
+    raw = key
+
+    if "•" in secondary:
+        left, right = [s.strip() for s in secondary.split("•", 1)]
+        if left:
+            short = left
+        if right:
+            raw = right
+
+    return primary, short, raw
 
 def _fmt_eta(x) -> str:
     if x is None or (isinstance(x, float) and pd.isna(x)):
@@ -172,6 +194,7 @@ def write_pdf_report(
 
     # Report meta (timestamp + coverage)
     c.setFont("Helvetica", 10)
+    c.setFillGray(0.25)
     if generated_at:
         c.drawString(left, y, f"Generated: {generated_at}")
         y -= 14
@@ -182,6 +205,8 @@ def write_pdf_report(
     # ------------------------
     # Run Configuration (auditable metadata)
     # ------------------------
+    c.setFillGray(0.0)
+    
     if run_config:
         c.setFont("Helvetica-Bold", 10)
         c.drawString(left, y, "Run Configuration")
@@ -232,13 +257,20 @@ def write_pdf_report(
     # ------------------------
     # Key Changes Since Last Report
     # ------------------------
+    c.setFillGray(0.0)
+    
     if delta_lines is not None:
         c.setFont("Helvetica-Bold", 12)
         c.drawString(left, y, "Key Changes Since Last Report")
         y -= 16
 
         c.setFont("Helvetica", 11)
+        seen = set()
         for line in delta_lines:
+            if line in seen:
+                continue
+            seen.add(line)
+            
             y = _draw_wrapped(
                 c,
                 left,
@@ -300,14 +332,26 @@ def write_pdf_report(
             eng = str(rr.get("engine_id", ""))
             pri = str(rr.get("priority", ""))
             hs = rr.get("health", "")
-            top = str(rr.get("top_risk", ""))
+
+            top_key = str(rr.get("top_risk", ""))
+            _top_primary, top_short, _top_raw = _signal_labels(top_key)
+
             eta = _fmt_eta(rr.get("eta_days"))
             action = str(rr.get("action", ""))
 
             # single compact line (wrap-safe)
-            alert = f"{eng} [{pri}]  Health {hs}  |  {top}  |  ETA {eta}  |  {action}"
-            y = _draw_wrapped(c, left, y, alert, max_width, line_height=11, font_name="Helvetica", font_size=9)
-            y -= 2
+            alert = f"{eng} [{pri}]  Health {hs}  |  {top_short}  |  ETA {eta}  |  {action}"
+            y = _draw_wrapped(
+                c,
+                left,
+                y,
+                alert,
+                max_width,
+                line_height=12,
+                font_name="Helvetica",
+                font_size=9,
+            )
+            y -= 3
 
         y -= 6
 
@@ -333,13 +377,14 @@ def write_pdf_report(
         for _, r in fleet_df.iterrows():
             eng = str(r["engine_id"])
             hs = f'{float(r["health"]):.1f}'
-            top = str(r["top_risk"])
+            top_key = str(r["top_risk"])
+            top_primary, top_secondary = signal_display_name(top_key)
+            top = top_primary            
             reason = str(r.get("reason", ""))
             action = str(r.get("action", ""))
             eta = _fmt_eta(r.get("eta_days"))
             pri = str(r["priority"])
             trend = r.get("trend", None)
-
 
             # ---- PRE-ROW PAGE BREAK (critical fix) ----
             min_row_height = 36  # enough for wrapped reason/top risk
@@ -373,7 +418,7 @@ def write_pdf_report(
             # Trend sparkline should be drawn inside X["trend"]..X["trend"]+COL_W["trend"]
             # (keep your sparkline function, just ensure it uses COL_W["trend"])
             # Trend sparkline
-            c.setLineWidth(0.6)
+            c.setLineWidth(0.7)
             _draw_sparkline(
                 c,
                 X["trend"],
@@ -385,10 +430,11 @@ def write_pdf_report(
 
             c.drawString(X["health"], y, hs)
 
+            # Top Risk (primary label)
             y_top = _draw_wrapped(
                 c, X["risk"], y, top,
                 max_width=COL_W["risk"], line_height=11,
-                font_name="Helvetica", font_size=9
+                font_name="Helvetica-Bold", font_size=9
             )
 
             y_reason = _draw_wrapped(
@@ -406,7 +452,7 @@ def write_pdf_report(
             c.drawString(X["eta"], y, eta)
             c.drawString(X["pri"], y, pri)
 
-            y = min(y_top, y_reason, y_action) - 10
+            y = min(y_top, y_reason, y_action) - 14
 
     # --- Footer (Page 1) ---
     _draw_footer(
@@ -427,6 +473,10 @@ def write_pdf_report(
     c.setFont("Helvetica-Bold", 18)
     c.drawString(left, y, "Blackreef — AxiomIQ Analytics Report")
     y -= 34
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left, y, f"Highest Priority Engine — Detailed Analysis ({focus_engine_id})")
+    y -= 18
 
     c.setFont("Helvetica-Bold", 14)
     c.drawString(left, y, "Executive Summary")
@@ -450,17 +500,21 @@ def write_pdf_report(
         for _, row in focus_risks.iterrows():
             param = row["param"]
             interp = interpret_param(param)
-
+            
             direction = row.get("direction", "→")
+
             eta_min = _fmt_eta(row.get("eta_to_min_days"))
             eta_max = _fmt_eta(row.get("eta_to_max_days"))
 
-            if y < 140:
-                c.showPage()
-                y = page_h - 60
+            primary, secondary = signal_display_name(str(param))
 
             c.setFont("Helvetica-Bold", 10)
-            c.drawString(left, y, f"{param} ({interp['system']})  Trend: {direction}")
+            c.drawString(left, y, f"{primary} ({interp['system']})  Trend: {direction}")
+
+            c.setFont("Helvetica", 8)
+            c.setFillGray(0.45)
+            c.drawString(left, y - 10, secondary)
+            c.setFillGray(0.0)
             
             # Mini trend chart (right side)
             has_chart = bool(focus_trends and str(param) in focus_trends)
@@ -470,7 +524,7 @@ def write_pdf_report(
             chart_lane = 0  # how much width we reserve on the right so text never collides
 
             if has_chart:
-                c.setLineWidth(0.6)
+                c.setLineWidth(1.25)
                 chart_x = page_w - right - chart_w
                 _draw_sparkline(
                     c,
@@ -485,7 +539,7 @@ def write_pdf_report(
             # Now that we know whether a chart exists, reserve space before writing wrapped text
             wrap_width = max_width - chart_lane
 
-            y -= 14
+            y -= 22
 
             y = _draw_wrapped(
                 c, left + 20, y,
@@ -511,7 +565,7 @@ def write_pdf_report(
             c.setLineWidth(0.3)
             c.line(left, y + 10, page_w - right, y + 10)
 
-            y -= 18
+            y -= 22
 
     # --- Footer (Page 2) ---
     _draw_footer(
