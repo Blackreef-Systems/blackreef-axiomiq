@@ -149,3 +149,4 @@ def test_injected_failure_increases_focus_max_risk(tmp_path: Path) -> None:
     failure_risk = _focus_max_risk(tmp_path, inject_failure=True, engine_id="DG1")
 
     assert failure_risk > healthy_risk
+    
